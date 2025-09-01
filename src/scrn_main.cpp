@@ -356,6 +356,7 @@ void ScreenMain::loop()
 
         // 測位モード
         if( sys_status.rmc_data.data_valid )
+        {
             switch(sys_status.rmc_data.fix_type)
             {
                 case NMEA_FIX_TYPE_NOFIX:
@@ -371,12 +372,13 @@ void ScreenMain::loop()
                     snprintf(buf, sizeof(buf), "Unknown");
                     break;
             }
+        }
         else
             snprintf(buf, sizeof(buf), "-");
         boxl_mode.set_text2(buf);
 
         // 測位できている場合は緯度経度を表示
-        if( sys_status.rmc_data.fix_type > NMEA_FIX_TYPE_NOFIX )
+        if( sys_status.rmc_data.data_valid && sys_status.rmc_data.fix_type > NMEA_FIX_TYPE_NOFIX )
         {
             // 緯度
             snprintf(buf, sizeof(buf), "%.6f", sys_status.rmc_data.latitude);

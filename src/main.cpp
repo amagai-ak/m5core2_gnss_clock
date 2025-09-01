@@ -291,11 +291,15 @@ void gnss_parse_line(char *line)
         // RMCメッセージの処理
 //        Serial.printf("RMC: %s", line);
         nmea_parse_rmc(line, &sys_status.rmc_data);
-        if( sys_status.rmc_data.data_valid ) 
+        if( sys_status.rmc_data.data_valid && sys_status.rmc_data.fix_type > NMEA_FIX_TYPE_NOFIX ) 
         {
             // RMCデータが有効な場合、システム時刻を更新
             rmc_to_systime(&sys_status.rmc_data);
             rtc_from_system_time();
+        }
+        else 
+        {
+            scrn_main.set_sync_state(0); // 測位できていない場合は同期状態を0に
         }
         ppsTimestamp = 0;
         sys_status.update_count++; // 更新回数をインクリメント

@@ -26,3 +26,9 @@ GNSSで時刻同期が出来るまでは，時計の文字は赤くなってい�
 ![DIP-SW](dipsw.png)
 
 赤枠のスイッチがON
+
+
+## 使用しているフォント
+
+https://fonts.google.com/specimen/Open+Sans
+
