@@ -449,7 +449,9 @@ void loop()
         // センサデータの更新
         sys_status.temp = bmp280.readTemperature();
         sys_status.pressure = bmp280.readPressure() / 100.0F;
-        Serial.printf("Temp: %.2f C, Pressure: %.2f hPa\r\n", sys_status.temp, sys_status.pressure);
+        #if GNSS_BYPASS == 0
+            Serial.printf("Temp: %.2f C, Pressure: %.2f hPa\r\n", sys_status.temp, sys_status.pressure);
+        #endif
     }
     else 
     {
