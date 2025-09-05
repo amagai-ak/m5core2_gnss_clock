@@ -18,6 +18,10 @@
 #define GNSS_RX_PIN 13
 #define GNSS_TX_PIN 14
 
+// 1にするとGNSSモジュールのシリアル通信をM5StackのSerialに接続する．
+// PCからu-centerでGNSSモジュールにアクセスしたい場合には1にする．
+#define GNSS_BYPASS 1
+
 #include <Arduino.h>
 #include <M5Unified.h>
 #include <time.h>
@@ -304,7 +308,8 @@ void gnss_parse_line(char *line)
         ppsTimestamp = 0;
         sys_status.update_count++; // 更新回数をインクリメント
     }
-    Serial.printf("%s\r\n", line);
+    // デバッグ用に受信した行を表示
+    // Serial.printf("%s\r\n", line);
 }
 
 
@@ -322,6 +327,9 @@ void gnss_poll()
     while( Serial1.available() )
     {
         c = Serial1.read();
+        #if GNSS_BYPASS
+        Serial.write(c); // GNSS_BYPASSが1の場合は受信したデータをそのままSerialに流す
+        #endif
         switch( linestate ) 
         {
             case 0: // 待機状態
@@ -420,6 +428,15 @@ void loop()
         prev_pps_timestamp = ppsTimestamp;
     }
     gnss_poll();
+
+    // Serialから入ったデータをそのままSerial1に流す
+    #if GNSS_BYPASS
+    while( Serial.available() ) 
+    {
+        char c = Serial.read();
+        Serial1.write(c);
+    }
+    #endif
 
     // LVGLのタスクハンドラを呼び出す
     lv_task_handler();
