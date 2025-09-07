@@ -27,6 +27,7 @@
 #define SD_SPI_MOSI_PIN 23
 
 static bool sd_initialized = false;
+static volatile bool sd_fault= false;
 
 /**
  * @brief SDカードの初期化を行う
@@ -40,18 +41,33 @@ int sd_init()
     SPI.begin(SD_SPI_SCK_PIN, SD_SPI_MISO_PIN, SD_SPI_MOSI_PIN, SD_SPI_CS_PIN);
     if (!SD.begin(SD_SPI_CS_PIN, SPI, 25000000)) 
     {
+        sd_fault = true;
         return -1;
     }
     sd_initialized = true;
+    sd_fault = false;
     return 0;
 }
 
+/**
+ * @brief SDカードの状態を取得する
+ * 
+ * @return true SDカードに異常が発生している
+ * @return false SDカードは正常
+ */
+bool sd_is_fault()
+{
+    return sd_fault;
+}
 
-SDLogger::SDLogger() : sd_status(SD_STATUS_ERROR), log_buffer(nullptr), buffer_pos(0) 
+
+SDLogger::SDLogger()
 {
     log_buffer = new uint8_t[buffer_size];
     prefix[0] = '\0';
     filename[0] = '\0';
+    buffer_pos = 0;
+    sd_status = SD_STATUS_ERROR;
 }
 
 
@@ -86,9 +102,9 @@ int SDLogger::start()
     time_t now = time(NULL);
     struct tm *t = localtime(&now);
 
-    if( !sd_initialized ) 
+    if( (!sd_initialized) || sd_fault ) 
     {
-        // SDカードが初期化されていない
+        // SDカードが初期化されていないか，障害が発生している場合は失敗
         return -1;
     }
 
@@ -106,6 +122,7 @@ int SDLogger::start()
     if (!logFile) 
     {
         sd_status = SD_STATUS_ERROR;
+        sd_fault = true;
         return -1;
     }
     sd_status = SD_STATUS_READY;
@@ -178,14 +195,27 @@ int SDLogger::write_data(const uint8_t* data, size_t length)
     }
     if (buffer_pos > 0) 
     {
-        logFile.write(log_buffer, buffer_pos);
+        if( logFile.write(log_buffer, buffer_pos) != buffer_pos )
+        {
+            sd_fault = true;
+            sd_status = SD_STATUS_ERROR;
+            logFile.close();
+            return -1;
+        }
         buffer_pos = 0;
     }
 
     if (length > buffer_size) 
     {
         // データがバッファサイズを超える場合は直接書き込む
-        logFile.write(data, length);
+        if( logFile.write(data, length) != length )
+        {
+            sd_fault = true;
+            sd_status = SD_STATUS_ERROR;
+            logFile.close();
+            return -1;
+        }
+        logFile.flush();
     } 
     else 
     {
@@ -216,7 +246,13 @@ int SDLogger::flush()
     }
     if (buffer_pos > 0) 
     {
-        logFile.write(log_buffer, buffer_pos);
+        if( logFile.write(log_buffer, buffer_pos) != buffer_pos )
+        {
+            sd_fault = true;
+            sd_status = SD_STATUS_ERROR;
+            logFile.close();
+            return -1;
+        }
         logFile.flush();
         buffer_pos = 0;
     }

@@ -25,7 +25,11 @@ void ScreenShutdown::on_button(lv_obj_t *btn)
     if (btn == btn_poweroff)
     {
         // Power off button pressed
-        M5.Power.powerOff();
+        // M5.Power.powerOff();
+        if( shutdown_request != nullptr )
+        {
+            *shutdown_request = 1; // シャットダウン要求をセット
+        }
     }
 }
 
@@ -34,6 +38,8 @@ void ScreenShutdown::setup()
 {
     // Setup code for the shutdown screen
     ScreenBase::setup();
+
+    shutdown_request = nullptr;
 
     lv_obj_set_style_bg_color(lv_screen, lv_color_make(64, 0, 0), 0);
 

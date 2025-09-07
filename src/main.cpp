@@ -57,6 +57,9 @@ static ScreenManager scrn_manager;
 #define BMP280_SENSOR_ADDR 0x76
 Adafruit_BMP280 bmp280(&Wire);
 
+// SDカードのNMEAロガー
+SDLogger nmea_logger;
+
 volatile uint32_t ppsTimestamp = 0;
 
 void IRAM_ATTR onPPSInterrupt() 
@@ -170,6 +173,8 @@ static void sys_status_init(system_status_t *status)
     nmea_init_gsv_data_all(&status->gsv_data);
     nmea_init_rmc(&status->rmc_data);
     nmea_init_gga(&status->gga_data);
+    status->sync_state = SYNC_STATE_NONE;
+    status->shutdown_request = 0;
 }
 
 
@@ -258,10 +263,12 @@ void rmc_to_systime(nmea_rmc_data_t *rmc)
         if( ppsLatency > 0 )
         {
             scrn_main.set_sync_state(2);        // PPS有効
+            sys_status.sync_state = SYNC_STATE_PPS;
         }
         else
         {
             scrn_main.set_sync_state(1);        // PPS無効
+            sys_status.sync_state = SYNC_STATE_GNSS;
         }
     }
 }
@@ -329,6 +336,7 @@ void gnss_poll()
     while( Serial1.available() )
     {
         c = Serial1.read();
+        nmea_logger.write_data((uint8_t *)&c, 1);
         #if GNSS_BYPASS
         Serial.write(c); // GNSS_BYPASSが1の場合は受信したデータをそのままSerialに流す
         #endif
@@ -410,6 +418,7 @@ void setup()
     // 各スクリーンのセットアップ
     scrn_main.setup();
     scrn_shutdown.setup();
+    scrn_shutdown.set_shutdown_request_ptr(&sys_status.shutdown_request);
 
     // スクリーンマネージャにスクリーンを追加
     // 最初に追加したスクリーンが最初に表示されるスクリーンになる
@@ -423,6 +432,7 @@ void setup()
     else 
     {
         scrn_main.set_sdcard_status(1); // SDカード使用可能
+        nmea_logger.set_prefix("/nmea");
     }
 }
 
@@ -430,6 +440,7 @@ void setup()
 void loop() 
 {
     static uint32_t prev_pps_timestamp = 0;
+    static int prev_sync_state = SYNC_STATE_NONE;
     static int eachsec = 0;
     M5.update();
 
@@ -467,6 +478,43 @@ void loop()
     else 
     {
         eachsec += 10;
+    }
+
+    // 時計の同期が取れたらNMEAロガーを起動
+    if( sd_is_fault() == false )
+    {
+        if( prev_sync_state != sys_status.sync_state && 
+            prev_sync_state == SYNC_STATE_NONE )
+        {
+            // Serial.printf("Sync state changed: %d\r\n", sys_status.sync_state);
+            prev_sync_state = sys_status.sync_state;
+            nmea_logger.start();
+            scrn_main.set_sdcard_status(2); // SDカード記録中
+        }
+    }
+    else 
+    {
+        scrn_main.set_sdcard_status(0); // SDカード利用不可
+    }
+
+    // シャットダウン要求があればシャットダウンする
+    if( sys_status.shutdown_request == 1 ) 
+    {
+        nmea_logger.close();
+        M5.Power.powerOff();
+        while(1) 
+        {
+            delay(1000);
+        }
+    }
+
+    // Bボタンが押されたらメイン画面へ，それ以外はシャットダウン画面へ
+    if (M5.BtnB.wasPressed()) {
+        scrn_manager.change_screen(SCREEN_ID_MAIN, SCREEN_ANIM_NONE);
+    } else if (M5.BtnA.wasPressed()) {
+        scrn_manager.change_screen(SCREEN_ID_SHUTDOWN, SCREEN_ANIM_NONE);
+    } else if (M5.BtnC.wasPressed()) {
+        scrn_manager.change_screen(SCREEN_ID_SHUTDOWN, SCREEN_ANIM_NONE);
     }
 
     delay(10);

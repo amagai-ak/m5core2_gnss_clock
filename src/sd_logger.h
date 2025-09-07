@@ -36,6 +36,7 @@ public:
 };
 
 extern int sd_init();
+extern bool sd_is_fault();
 
 #endif // SD_LOGGER_H
 

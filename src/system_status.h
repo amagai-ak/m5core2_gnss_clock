@@ -3,6 +3,11 @@
 
 #include "nmea_parser.h"
 
+#define SYNC_STATE_NONE 0
+#define SYNC_STATE_GNSS 1
+#define SYNC_STATE_PPS 2
+#define SYNC_STATE_LOST 3
+
 typedef struct {
     unsigned int update_count; // 更新回数
     int gps_status; // GPS status
@@ -12,6 +17,9 @@ typedef struct {
     nmea_gga_data_t gga_data;    // NMEA GGA data
     float temp;
     float pressure;
+
+    int sync_state; // 0: not synchronized, 1: synchronized
+    int shutdown_request; // 1: shutdown requested, 0: running
 } system_status_t;
 
 extern system_status_t sys_status;

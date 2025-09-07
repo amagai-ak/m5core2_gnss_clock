@@ -350,7 +350,7 @@ void ScreenMain::set_sdcard_status(int status)
             case 2: // 使用中
                 boxl_sdcard.set_bg_color(lv_color_make(128, 0, 0));
                 boxl_sdcard.set_text_color(lv_color_make(255, 255, 255));
-                boxl_sdcard.set_text(LV_SYMBOL_SD_CARD " Rec" LV_SYMBOL_DOWNLOAD);
+                boxl_sdcard.set_text(LV_SYMBOL_SD_CARD " Rec");
                 break;
             default:
                 break;
