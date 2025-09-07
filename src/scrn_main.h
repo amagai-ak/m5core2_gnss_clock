@@ -109,8 +109,10 @@ protected:
     BoxLabel boxl_lon;
     BoxLabel boxl_temp;
     BoxLabel boxl_pres;
+    BoxLabel boxl_sdcard;
     int sync_state; // 0: 未同期, 1: 同期中, 2: 同期完了
     int sync_state_prev;
+    int sdcard_state; // 0: 利用不可, 1: 使用可能, 2: 使用中
 
 public:
     void setup();
@@ -124,6 +126,7 @@ public:
     void update_satellite(nmea_gsv_data_t *gsv_data);
     void update_satellite_all();
     void set_sync_state(int state); // 0: 未同期, 1: 同期中, 2: 同期完了
+    void set_sdcard_status(int status);
 };
 
 #endif // SCRN_MAIN_H

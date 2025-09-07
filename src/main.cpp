@@ -39,6 +39,8 @@
 #include "nmea_parser.h"
 #include "system_status.h"
 
+#include "sd_logger.h"
+
 static const char* time_zone  = "JST-9";
 const int time_zone_offset = 9 * 3600; // JSTはUTC+9時間
 
@@ -413,6 +415,15 @@ void setup()
     // 最初に追加したスクリーンが最初に表示されるスクリーンになる
     scrn_manager.add_screen(SCREEN_ID_MAIN, &scrn_main);
     scrn_manager.add_screen(SCREEN_ID_SHUTDOWN, &scrn_shutdown);
+
+    if (sd_init() != 0) 
+    {
+        scrn_main.set_sdcard_status(0); // SDカード利用不可
+    }
+    else 
+    {
+        scrn_main.set_sdcard_status(1); // SDカード使用可能
+    }
 }
 
 

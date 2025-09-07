@@ -317,8 +317,45 @@ void ScreenMain::setup()
     boxl_pres.set_font(&lv_font_montserrat_24);
     boxl_pres.set_align(LV_TEXT_ALIGN_LEFT);
 
+    // SDカードの状態表示用のボックスラベル
+    boxl_sdcard.init(lv_screen, 220, 100, 100, lbl_h, LV_SYMBOL_SD_CARD " No");
+    boxl_sdcard.set_bg_color(lv_color_make(32, 32, 32));
+    boxl_sdcard.set_text_color(lv_color_make(0, 0, 0));
+    boxl_sdcard.set_font(&lv_font_montserrat_24);
+    boxl_sdcard.set_align(LV_TEXT_ALIGN_CENTER);
+    sdcard_state = 0;
+
     // スワイプジェスチャーの有効化
     lv_obj_add_event_cb(lv_screen, callback, LV_EVENT_GESTURE, this);
+}
+
+
+void ScreenMain::set_sdcard_status(int status)
+{
+    if( sdcard_state != status )
+    {
+        sdcard_state = status;
+        switch( sdcard_state )
+        {
+            case 0: // 利用不可
+                boxl_sdcard.set_bg_color(lv_color_make(32, 32, 32));
+                boxl_sdcard.set_text_color(lv_color_make(0, 0, 0));
+                boxl_sdcard.set_text(LV_SYMBOL_SD_CARD " No");
+                break;
+            case 1: // 使用可能
+                boxl_sdcard.set_bg_color(lv_color_make(64, 64, 64));
+                boxl_sdcard.set_text_color(lv_color_make(255, 255, 255));
+                boxl_sdcard.set_text(LV_SYMBOL_SD_CARD " Rdy");
+                break;
+            case 2: // 使用中
+                boxl_sdcard.set_bg_color(lv_color_make(128, 0, 0));
+                boxl_sdcard.set_text_color(lv_color_make(255, 255, 255));
+                boxl_sdcard.set_text(LV_SYMBOL_SD_CARD " Rec" LV_SYMBOL_DOWNLOAD);
+                break;
+            default:
+                break;
+        }
+    }
 }
 
 
