@@ -442,7 +442,8 @@ void loop()
     static uint32_t prev_pps_timestamp = 0;
     static int prev_sync_state = SYNC_STATE_NONE;
     static int eachsec = 0;
-    //    M5.update();  // LVGLを使う場合はM5.update()は呼び出さない
+    
+    M5.update();
 
     if (ppsTimestamp != 0 && ppsTimestamp != prev_pps_timestamp) 
     {
