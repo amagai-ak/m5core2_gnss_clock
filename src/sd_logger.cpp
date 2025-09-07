@@ -191,6 +191,7 @@ int SDLogger::write_data(const uint8_t* data, size_t length)
     if (!logFile) 
     {
         sd_status = SD_STATUS_ERROR;
+        sd_fault = true;
         return -1;
     }
     if (buffer_pos > 0) 
@@ -242,6 +243,7 @@ int SDLogger::flush()
     if (!logFile) 
     {
         sd_status = SD_STATUS_ERROR;
+        sd_fault = true;
         return -1;
     }
     if (buffer_pos > 0) 
