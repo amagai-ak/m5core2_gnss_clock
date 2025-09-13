@@ -63,6 +63,7 @@ Adafruit_BMP280 bmp280(&Wire);
 
 // SDカードのNMEAロガー
 SDLogger nmea_logger;
+SDLogger *position_logger;
 
 // IMUロガー
 SensorLogger sensor_logger;
@@ -282,13 +283,40 @@ void rmc_to_systime(nmea_rmc_data_t *rmc)
 
 
 /**
+ * @brief GGAデータから位置情報をSDカードに記録する
+ * 
+ */
+void log_position_data(nmea_gga_data_t *gga_data)
+{
+    if( position_logger->get_status() == SD_STATUS_READY )
+    {
+        char log_line[128];
+        int n;
+        n = snprintf(log_line, sizeof(log_line), 
+        "%02d:%02d:%02d.%03d,%.7f,%.7f,%.2f,%d,%d,%.2f\n",
+        gga_data->time_hour, gga_data->time_minute, gga_data->time_second, gga_data->time_millisecond,
+        gga_data->latitude, gga_data->longitude, gga_data->altitude,
+        gga_data->fix_type, gga_data->num_sats, gga_data->hdop);
+
+        position_logger->write_data((uint8_t *)log_line, n);
+    }
+}
+
+
+/**
  * @brief GNSSデータの行を解析する
  * 
  * @param line 解析する行
  */
-void gnss_parse_line(char *line)
+void gnss_parse_nmea_line(char *line)
 {
     nmea_gga_data_t new_gga;
+
+    if( !nmea_is_valid_checksum(line) )
+    {
+        // チェックサムエラー
+        return;
+    }
 
     if (strncmp(line, "$GNGGA", 6) == 0) 
     {
@@ -299,6 +327,7 @@ void gnss_parse_line(char *line)
             sys_status.gga_data = new_gga; // 新しいGGAデータを更新
             sys_status.gps_status = new_gga.fix_type; // GPSの状態を更新
             sys_status.gps_satellites = new_gga.num_sats; // 使用衛星数を更新
+            log_position_data(&new_gga); // 位置情報をSDカードに記録
         }
     }
     else if( line[1] == 'G' && line[3] == 'G' && line[4] == 'S' && line[5] == 'V' )
@@ -338,6 +367,7 @@ void gnss_poll()
     static char linebuf[256];
     static int linepos = 0;
     static int linestate = 0;
+    static int ubx_payload_length = 0;
     char c;
 
     while( Serial1.available() )
@@ -354,16 +384,27 @@ void gnss_poll()
                 {
                     linebuf[0] = c;
                     linepos = 1;
-                    linestate = 1; // 受信状態へ
+                    linestate = 1; // NMEA受信状態へ
+                }
+                else 
+                {
+                    if( c == 0xb5 ) 
+                    {
+                        // UBXメッセージの開始バイト1
+                        linebuf[0] = c;
+                        linepos = 1;
+                        linestate = 2; // UBX受信状態へ
+                    }
                 }
                 break;
-            case 1: // 受信状態
+
+            case 1: // NMEA受信状態
                 if( c == '\n' ) 
                 {
                     linebuf[linepos] = '\0';
                     linestate = 0; // 待機状態へ
                     // 行の終端に達したのでパースする
-                    gnss_parse_line(linebuf);
+                    gnss_parse_nmea_line(linebuf);
                     linepos = 0;
                 }
                 else if( c == '\r' ) 
@@ -383,6 +424,71 @@ void gnss_poll()
                     }
                 }
                 break;
+
+            case 2: // UBX受信状態
+                if( c == 0x62 ) 
+                {
+                    // UBXメッセージの開始バイト2
+                    linebuf[linepos++] = c;
+                    linestate = 3; // UBX CLASS受信状態へ
+                }
+                else 
+                {
+                    // SYNC CHARが続かなかったのでリセット
+                    linestate = 0;
+                    linepos = 0;
+                }
+                break;
+
+            case 3: // UBX CLASS受信状態
+                linebuf[linepos++] = c;
+                linestate = 4; // UBX ID受信状態へ
+                break;
+
+            case 4: // UBX ID受信状態
+                linebuf[linepos++] = c;
+                linestate = 5; // UBX LENGTH受信状態へ
+                break;
+
+            case 5: // UBX LENGTH受信状態
+                linebuf[linepos++] = c;
+                if( linepos == 6 ) 
+                {
+                    // LENGTHの2バイト目を受信した
+                    ubx_payload_length = linebuf[4] | (linebuf[5] << 8);
+                    if( ubx_payload_length > sizeof(linebuf) - 8 ) 
+                    {
+                        // 異常に長いペイロード長なのでリセット
+                        linestate = 0;
+                        linepos = 0;
+                    }
+                    else 
+                    {
+                        linestate = 6; // UBX PAYLOAD受信状態へ
+                    }
+                }
+                break;
+            
+            case 6: // UBX PAYLOAD受信状態
+                if( linepos < sizeof(linebuf) - 1 ) 
+                {
+                    linebuf[linepos++] = c;
+                    if( linepos >= 6 + ubx_payload_length + 2 ) 
+                    {
+                        // ペイロードとチェックサムを受信し終わった
+                        // ここで本来はUBXメッセージのパースを行うが，今は行わない
+                        linestate = 0; // 待機状態へ
+                        linepos = 0;
+                    }
+                }
+                else 
+                {
+                    // バッファオーバーフロー防止のためリセット
+                    linestate = 0;
+                    linepos = 0;
+                }
+                break;
+
             default:
                 linestate = 0; // 不正な状態になったら待機状態へ
                 linepos = 0;
@@ -432,6 +538,7 @@ void setup()
     scrn_manager.add_screen(SCREEN_ID_MAIN, &scrn_main);
     scrn_manager.add_screen(SCREEN_ID_SHUTDOWN, &scrn_shutdown);
 
+    position_logger = new SDLogger();
     if (sd_init() != 0) 
     {
         scrn_main.set_sdcard_status(0); // SDカード利用不可
@@ -440,6 +547,7 @@ void setup()
     {
         scrn_main.set_sdcard_status(1); // SDカード使用可能
         nmea_logger.set_prefix("/nmea");
+        position_logger->set_prefix("/position");
     }
 }
 
@@ -470,8 +578,11 @@ void loop()
     }
     #endif
 
-    // LVGLのタスクハンドラを呼び出す
+    // LVGLのタスクハンドラを呼び出す.
+    // SDカードとLCDがSPIを共有しているので排他制御が必要
+    sd_lock();
     lv_task_handler();
+    sd_unlock();
     scrn_manager.loop();
 
     // 毎秒1回の動作
@@ -501,6 +612,7 @@ void loop()
             // Serial.printf("Sync state changed: %d\r\n", sys_status.sync_state);
             prev_sync_state = sys_status.sync_state;
             nmea_logger.start();
+            position_logger->start();
             sensor_logger.start();
             scrn_main.set_sdcard_status(2); // SDカード記録中
         }

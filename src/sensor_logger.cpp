@@ -98,7 +98,7 @@ public:
 };
 
 
-static IMUFifo *imufifo;
+static IMUFifo *imufifo = NULL;
 
 /**
  * @brief センサーデータのサンプリングタスク
@@ -137,7 +137,7 @@ static void task_sensor_sampler(void *param)
         vTaskDelayUntil(&xLastWakeTime, sample_period_ms / portTICK_PERIOD_MS);
     }
     sensor_sampler_terminated = true;
-    
+
     vTaskDelete(NULL);
 }
 
@@ -167,7 +167,8 @@ static void task_sensor_logger(void *param)
             {
                 if (imu_logger.write_data((const uint8_t *)logline, len) != 0) 
                 {
-                    ESP_LOGE("SDLogger", "Failed to write data");
+                    ESP_LOGE("SensorLogger", "Failed to write data");
+                    terminate_sensor_logging = true;
                 }
             }
         } 
@@ -217,6 +218,7 @@ int SensorLogger::start()
         if (sensor_sampler_handle == NULL) 
         {
             ESP_LOGE("SensorLogger", "Failed to create SensorSampler task");
+            sensor_sampler_terminated = true;
             return -1;
         }
     }
@@ -227,6 +229,8 @@ int SensorLogger::start()
         if (sensor_logger_handle == NULL) 
         {
             ESP_LOGE("SensorLogger", "Failed to create SensorLogger task");
+            sensor_logger_terminated = true;
+            terminate_sensor_logging = true;
             return -1;
         }
     }

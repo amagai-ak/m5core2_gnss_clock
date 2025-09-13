@@ -34,13 +34,13 @@ static volatile bool sd_fault= false;
 static SemaphoreHandle_t sd_mutex;
 
 
-static inline void sd_lock() 
+void sd_lock() 
 {
     xSemaphoreTake(sd_mutex, portMAX_DELAY);
 }
 
 
-static inline void sd_unlock() 
+void sd_unlock() 
 {
     xSemaphoreGive(sd_mutex);
 }
@@ -91,6 +91,7 @@ SDLogger::SDLogger()
     if( log_buffer == NULL ) 
     {
         sd_fault = true;
+        ESP_LOGE("SDLogger", "Failed to allocate log buffer");
     }
     prefix[0] = '\0';
     filename[0] = '\0';
@@ -146,16 +147,19 @@ int SDLogger::start()
     int n = strlen(filename);
     strftime(filename + n, sizeof(filename) - n, "_%Y%m%d_%H%M%S.log", t);
 
+    sd_lock();
     logFile = SD.open(filename, FILE_WRITE);
     if (!logFile) 
     {
         sd_status = SD_STATUS_ERROR;
         sd_fault = true;
+        sd_unlock();
         return -1;
     }
     sd_status = SD_STATUS_READY;
     buffer_pos = 0;
     logFile.close();
+    sd_unlock();
     return 0;
 }
 
@@ -166,6 +170,7 @@ int SDLogger::start()
  * @return int 成功すれば0，失敗すれば-1
  * 
  * 既に開始されている場合は一旦閉じてから再度開始する．
+ * 新しい日付でファイル名が生成される．
  */
 int SDLogger::restart() 
 {
@@ -222,6 +227,7 @@ int SDLogger::write_data(const uint8_t* data, size_t length)
         sd_status = SD_STATUS_ERROR;
         sd_fault = true;
         sd_unlock();
+        ESP_LOGE("SDLogger", "Failed to open log file");
         return -1;
     }
     if (buffer_pos > 0) 
@@ -232,6 +238,7 @@ int SDLogger::write_data(const uint8_t* data, size_t length)
             sd_status = SD_STATUS_ERROR;
             logFile.close();
             sd_unlock();
+            ESP_LOGE("SDLogger", "Failed to write data");
             return -1;
         }
         buffer_pos = 0;
@@ -246,6 +253,7 @@ int SDLogger::write_data(const uint8_t* data, size_t length)
             sd_status = SD_STATUS_ERROR;
             logFile.close();
             sd_unlock();
+            ESP_LOGE("SDLogger", "Failed to write data");
             return -1;
         }
         logFile.flush();
@@ -279,6 +287,7 @@ int SDLogger::flush()
         sd_status = SD_STATUS_ERROR;
         sd_fault = true;
         sd_unlock();
+        ESP_LOGE("SDLogger", "Failed to open log file");
         return -1;
     }
     if (buffer_pos > 0) 
@@ -289,6 +298,7 @@ int SDLogger::flush()
             sd_status = SD_STATUS_ERROR;
             logFile.close();
             sd_unlock();
+            ESP_LOGE("SDLogger", "Failed to write data");
             return -1;
         }
         logFile.flush();
