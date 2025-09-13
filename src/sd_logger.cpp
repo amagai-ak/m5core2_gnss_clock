@@ -16,6 +16,9 @@
 
 #include "sd_logger.h"
 
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
+
 
 // SDカードのSPIピン設定
 // M5satack Core2用
@@ -28,6 +31,20 @@
 
 static bool sd_initialized = false;
 static volatile bool sd_fault= false;
+static SemaphoreHandle_t sd_mutex;
+
+
+static void sd_lock() 
+{
+    xSemaphoreTake(sd_mutex, portMAX_DELAY);
+}
+
+
+static void sd_unlock() 
+{
+    xSemaphoreGive(sd_mutex);
+}
+
 
 /**
  * @brief SDカードの初期化を行う
@@ -38,6 +55,12 @@ static volatile bool sd_fault= false;
  */
 int sd_init()
 {
+    if( sd_initialized ) 
+    {
+        return 0; // すでに初期化されている場合は何もしない
+    }
+
+    sd_mutex = xSemaphoreCreateMutex();
     SPI.begin(SD_SPI_SCK_PIN, SD_SPI_MISO_PIN, SD_SPI_MOSI_PIN, SD_SPI_CS_PIN);
     if (!SD.begin(SD_SPI_CS_PIN, SPI, 25000000)) 
     {
@@ -48,6 +71,7 @@ int sd_init()
     sd_fault = false;
     return 0;
 }
+
 
 /**
  * @brief SDカードの状態を取得する
@@ -64,6 +88,10 @@ bool sd_is_fault()
 SDLogger::SDLogger()
 {
     log_buffer = new uint8_t[buffer_size];
+    if( log_buffer == NULL ) 
+    {
+        sd_fault = true;
+    }
     prefix[0] = '\0';
     filename[0] = '\0';
     buffer_pos = 0;
@@ -187,11 +215,13 @@ int SDLogger::write_data(const uint8_t* data, size_t length)
         return 0;
     }
     // バッファに収まらない場合は，バッファをフラッシュしてから追加
+    sd_lock();
     logFile = SD.open(filename, FILE_APPEND);
     if (!logFile) 
     {
         sd_status = SD_STATUS_ERROR;
         sd_fault = true;
+        sd_unlock();
         return -1;
     }
     if (buffer_pos > 0) 
@@ -201,6 +231,7 @@ int SDLogger::write_data(const uint8_t* data, size_t length)
             sd_fault = true;
             sd_status = SD_STATUS_ERROR;
             logFile.close();
+            sd_unlock();
             return -1;
         }
         buffer_pos = 0;
@@ -214,6 +245,7 @@ int SDLogger::write_data(const uint8_t* data, size_t length)
             sd_fault = true;
             sd_status = SD_STATUS_ERROR;
             logFile.close();
+            sd_unlock();
             return -1;
         }
         logFile.flush();
@@ -224,6 +256,7 @@ int SDLogger::write_data(const uint8_t* data, size_t length)
         buffer_pos = length;
     }
     logFile.close();
+    sd_unlock();
     return 0;
 }
 
@@ -239,11 +272,13 @@ int SDLogger::flush()
     {
         return -1;
     }
+    sd_lock();
     logFile = SD.open(filename, FILE_APPEND);
     if (!logFile) 
     {
         sd_status = SD_STATUS_ERROR;
         sd_fault = true;
+        sd_unlock();
         return -1;
     }
     if (buffer_pos > 0) 
@@ -253,11 +288,13 @@ int SDLogger::flush()
             sd_fault = true;
             sd_status = SD_STATUS_ERROR;
             logFile.close();
+            sd_unlock();
             return -1;
         }
         logFile.flush();
         buffer_pos = 0;
     }
     logFile.close();
+    sd_unlock();
     return 0;
 }

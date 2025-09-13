@@ -40,6 +40,10 @@
 #include "system_status.h"
 
 #include "sd_logger.h"
+#include "i2cmutex.h"
+
+
+I2CMutex i2c_mutex;
 
 static const char* time_zone  = "JST-9";
 const int time_zone_offset = 9 * 3600; // JSTはUTC+9時間
@@ -443,7 +447,9 @@ void loop()
     static int prev_sync_state = SYNC_STATE_NONE;
     static int eachsec = 0;
     
+    i2c_mutex.lock();
     M5.update();
+    i2c_mutex.unlock();
 
     if (ppsTimestamp != 0 && ppsTimestamp != prev_pps_timestamp) 
     {
