@@ -28,6 +28,7 @@ public:
     int start();
     int restart();
     int close();
+    int stop(){ return close(); }
     int write_data(const uint8_t* data, size_t length);
     int flush();
     ~SDLogger();

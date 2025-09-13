@@ -478,9 +478,11 @@ void loop()
     if( eachsec > 1000 ) 
     {
         eachsec = 0;
-        // センサデータの更新
+        // 温度センサデータの更新
+        i2c_mutex.lock();
         sys_status.temp = bmp280.readTemperature();
         sys_status.pressure = bmp280.readPressure() / 100.0F;
+        i2c_mutex.unlock();
         #if GNSS_BYPASS == 0
             Serial.printf("Temp: %.2f C, Pressure: %.2f hPa\r\n", sys_status.temp, sys_status.pressure);
         #endif
@@ -490,7 +492,7 @@ void loop()
         eachsec += 10;
     }
 
-    // 時計の同期が取れたらNMEAロガーを起動
+    // 時計の同期が取れたらロガーを起動
     if( sd_is_fault() == false )
     {
         if( prev_sync_state != sys_status.sync_state && 
@@ -511,8 +513,9 @@ void loop()
     // シャットダウン要求があればシャットダウンする
     if( sys_status.shutdown_request == 1 ) 
     {
-        nmea_logger.close();
+        nmea_logger.stop();
         sensor_logger.stop();
+        delay(100);
         M5.Power.powerOff();
         while(1) 
         {
