@@ -318,7 +318,7 @@ void ScreenMain::setup()
     boxl_pres.set_align(LV_TEXT_ALIGN_LEFT);
 
     // SDカードの状態表示用のボックスラベル
-    boxl_sdcard.init(lv_screen, 220, 100, 100, lbl_h, LV_SYMBOL_SD_CARD " No");
+    boxl_sdcard.init(lv_screen, 220, 100, 100, lbl_h, LV_SYMBOL_SD_CARD " --");
     boxl_sdcard.set_bg_color(lv_color_make(32, 32, 32));
     boxl_sdcard.set_text_color(lv_color_make(0, 0, 0));
     boxl_sdcard.set_font(&lv_font_montserrat_24);
@@ -340,14 +340,14 @@ void ScreenMain::set_sdcard_status(int status)
             case 0: // 利用不可
                 boxl_sdcard.set_bg_color(lv_color_make(32, 32, 32));
                 boxl_sdcard.set_text_color(lv_color_make(0, 0, 0));
-                boxl_sdcard.set_text(LV_SYMBOL_SD_CARD " No");
+                boxl_sdcard.set_text(LV_SYMBOL_SD_CARD " --");
                 break;
             case 1: // 使用可能
                 boxl_sdcard.set_bg_color(lv_color_make(64, 64, 64));
                 boxl_sdcard.set_text_color(lv_color_make(255, 255, 255));
                 boxl_sdcard.set_text(LV_SYMBOL_SD_CARD " Rdy");
                 break;
-            case 2: // 使用中
+            case 2: // 記録中
                 boxl_sdcard.set_bg_color(lv_color_make(128, 0, 0));
                 boxl_sdcard.set_text_color(lv_color_make(255, 255, 255));
                 boxl_sdcard.set_text(LV_SYMBOL_SD_CARD " Rec");

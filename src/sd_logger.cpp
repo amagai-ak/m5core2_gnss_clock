@@ -34,13 +34,13 @@ static volatile bool sd_fault= false;
 static SemaphoreHandle_t sd_mutex;
 
 
-static void sd_lock() 
+static inline void sd_lock() 
 {
     xSemaphoreTake(sd_mutex, portMAX_DELAY);
 }
 
 
-static void sd_unlock() 
+static inline void sd_unlock() 
 {
     xSemaphoreGive(sd_mutex);
 }

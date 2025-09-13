@@ -41,7 +41,7 @@
 
 #include "sd_logger.h"
 #include "i2cmutex.h"
-
+#include "sensor_logger.h"
 
 I2CMutex i2c_mutex;
 
@@ -63,6 +63,9 @@ Adafruit_BMP280 bmp280(&Wire);
 
 // SDカードのNMEAロガー
 SDLogger nmea_logger;
+
+// IMUロガー
+SensorLogger sensor_logger;
 
 volatile uint32_t ppsTimestamp = 0;
 
@@ -496,6 +499,7 @@ void loop()
             // Serial.printf("Sync state changed: %d\r\n", sys_status.sync_state);
             prev_sync_state = sys_status.sync_state;
             nmea_logger.start();
+            sensor_logger.start();
             scrn_main.set_sdcard_status(2); // SDカード記録中
         }
     }
@@ -508,6 +512,7 @@ void loop()
     if( sys_status.shutdown_request == 1 ) 
     {
         nmea_logger.close();
+        sensor_logger.stop();
         M5.Power.powerOff();
         while(1) 
         {
