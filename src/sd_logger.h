@@ -8,6 +8,8 @@
 
 #include <time.h>
 
+#include "bus_mutex.h"
+
 #define SD_STATUS_ERROR 0
 #define SD_STATUS_READY 1
 
@@ -39,8 +41,4 @@ public:
 extern int sd_init();
 extern bool sd_is_fault();
 
-extern void sd_lock();
-extern void sd_unlock();
-
 #endif // SD_LOGGER_H
-

@@ -40,10 +40,11 @@
 #include "system_status.h"
 
 #include "sd_logger.h"
-#include "i2cmutex.h"
+#include "bus_mutex.h"
 #include "sensor_logger.h"
 
-I2CMutex i2c_mutex;
+SimpleMutex i2c_mutex;
+SimpleMutex spi_mutex;
 
 static const char* time_zone  = "JST-9";
 const int time_zone_offset = 9 * 3600; // JSTはUTC+9時間
@@ -580,9 +581,9 @@ void loop()
 
     // LVGLのタスクハンドラを呼び出す.
     // SDカードとLCDがSPIを共有しているので排他制御が必要
-    sd_lock();
+    spi_mutex.lock();
     lv_task_handler();
-    sd_unlock();
+    spi_mutex.unlock();
     scrn_manager.loop();
 
     // 毎秒1回の動作

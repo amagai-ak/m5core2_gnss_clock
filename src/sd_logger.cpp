@@ -31,19 +31,6 @@
 
 static bool sd_initialized = false;
 static volatile bool sd_fault= false;
-static SemaphoreHandle_t sd_mutex;
-
-
-void sd_lock() 
-{
-    xSemaphoreTake(sd_mutex, portMAX_DELAY);
-}
-
-
-void sd_unlock() 
-{
-    xSemaphoreGive(sd_mutex);
-}
 
 
 /**
@@ -60,7 +47,6 @@ int sd_init()
         return 0; // すでに初期化されている場合は何もしない
     }
 
-    sd_mutex = xSemaphoreCreateMutex();
     SPI.begin(SD_SPI_SCK_PIN, SD_SPI_MISO_PIN, SD_SPI_MOSI_PIN, SD_SPI_CS_PIN);
     if (!SD.begin(SD_SPI_CS_PIN, SPI, 25000000)) 
     {
@@ -147,19 +133,19 @@ int SDLogger::start()
     int n = strlen(filename);
     strftime(filename + n, sizeof(filename) - n, "_%Y%m%d_%H%M%S.log", t);
 
-    sd_lock();
+    spi_mutex.lock();
     logFile = SD.open(filename, FILE_WRITE);
     if (!logFile) 
     {
         sd_status = SD_STATUS_ERROR;
         sd_fault = true;
-        sd_unlock();
+        spi_mutex.unlock();
         return -1;
     }
     sd_status = SD_STATUS_READY;
     buffer_pos = 0;
     logFile.close();
-    sd_unlock();
+    spi_mutex.unlock();
     return 0;
 }
 
@@ -220,13 +206,13 @@ int SDLogger::write_data(const uint8_t* data, size_t length)
         return 0;
     }
     // バッファに収まらない場合は，バッファをフラッシュしてから追加
-    sd_lock();
+    spi_mutex.lock();
     logFile = SD.open(filename, FILE_APPEND);
     if (!logFile) 
     {
         sd_status = SD_STATUS_ERROR;
         sd_fault = true;
-        sd_unlock();
+        spi_mutex.unlock();
         ESP_LOGE("SDLogger", "Failed to open log file");
         return -1;
     }
@@ -237,7 +223,7 @@ int SDLogger::write_data(const uint8_t* data, size_t length)
             sd_fault = true;
             sd_status = SD_STATUS_ERROR;
             logFile.close();
-            sd_unlock();
+            spi_mutex.unlock();
             ESP_LOGE("SDLogger", "Failed to write data");
             return -1;
         }
@@ -252,7 +238,7 @@ int SDLogger::write_data(const uint8_t* data, size_t length)
             sd_fault = true;
             sd_status = SD_STATUS_ERROR;
             logFile.close();
-            sd_unlock();
+            spi_mutex.unlock();
             ESP_LOGE("SDLogger", "Failed to write data");
             return -1;
         }
@@ -264,7 +250,7 @@ int SDLogger::write_data(const uint8_t* data, size_t length)
         buffer_pos = length;
     }
     logFile.close();
-    sd_unlock();
+    spi_mutex.unlock();
     return 0;
 }
 
@@ -280,13 +266,13 @@ int SDLogger::flush()
     {
         return -1;
     }
-    sd_lock();
+    spi_mutex.lock();
     logFile = SD.open(filename, FILE_APPEND);
     if (!logFile) 
     {
         sd_status = SD_STATUS_ERROR;
         sd_fault = true;
-        sd_unlock();
+        spi_mutex.unlock();
         ESP_LOGE("SDLogger", "Failed to open log file");
         return -1;
     }
@@ -297,7 +283,7 @@ int SDLogger::flush()
             sd_fault = true;
             sd_status = SD_STATUS_ERROR;
             logFile.close();
-            sd_unlock();
+            spi_mutex.unlock();
             ESP_LOGE("SDLogger", "Failed to write data");
             return -1;
         }
@@ -305,6 +291,6 @@ int SDLogger::flush()
         buffer_pos = 0;
     }
     logFile.close();
-    sd_unlock();
+    spi_mutex.unlock();
     return 0;
 }

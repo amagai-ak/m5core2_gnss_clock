@@ -3,7 +3,7 @@
 #define SENSOR_LOGGER_H
 
 #include "sd_logger.h"
-#include "i2cmutex.h"
+#include "bus_mutex.h"
 
 typedef struct {
     struct timeval timestamp; // タイムスタンプ
