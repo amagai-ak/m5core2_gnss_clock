@@ -10,7 +10,6 @@
  */
 
 #include "sensor_logger.h"
-SDLogger imu_logger;
 
 static volatile bool terminate_sensor_logging = false;
 static TaskHandle_t sensor_sampler_handle;
@@ -152,6 +151,20 @@ static void task_sensor_logger(void *param)
     imu_record_t record;
     char logline[128];
     int len;
+    SDLogger *imu_logger;
+
+    imu_logger = new SDLogger();
+    if (imu_logger == NULL)
+    {
+        ESP_LOGE("SensorLogger", "Failed to create SDLogger");
+        terminate_sensor_logging = true;
+        sensor_logger_terminated = true;
+        vTaskDelete(NULL);
+        return;
+    }
+
+    imu_logger->set_prefix("/imu");
+    imu_logger->start();
 
     while (terminate_sensor_logging == false) 
     {
@@ -165,7 +178,7 @@ static void task_sensor_logger(void *param)
                            record.gx, record.gy, record.gz);
             if (len > 0 && len < sizeof(logline)) 
             {
-                if (imu_logger.write_data((const uint8_t *)logline, len) != 0) 
+                if (imu_logger->write_data((const uint8_t *)logline, len) != 0) 
                 {
                     ESP_LOGE("SensorLogger", "Failed to write data");
                     terminate_sensor_logging = true;
@@ -178,7 +191,9 @@ static void task_sensor_logger(void *param)
             vTaskDelay(100 / portTICK_PERIOD_MS);
         }
     }
-    imu_logger.close();
+    imu_logger->close();
+    delete imu_logger;
+
     sensor_logger_terminated = true;
 
     vTaskDelete(NULL);
@@ -210,8 +225,6 @@ int SensorLogger::start()
         return -1;
     }
 
-    imu_logger.set_prefix("/imu");
-    imu_logger.start();
     if (sensor_sampler_handle == NULL) 
     {
         xTaskCreatePinnedToCore(task_sensor_sampler, "SensorSampler", 2048, NULL, 2, &sensor_sampler_handle, 1);

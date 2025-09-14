@@ -1,7 +1,7 @@
 /**
  * @file main.cpp
  * @author amagai
- * @brief GNSSモジュールの動作テスト．Core2用．
+ * @brief GNSSモジュールを使った時計＆ロガー．M5Stack Core2用．
  * @version 0.1
  * @date 2025-08-30
  * 
@@ -9,7 +9,7 @@
  * 
  */
 
-// GNSSモジュールのディップスイッチ
+// GNSSモジュールのディップスイッチのCore2用設定
 // PPS: GPIO35
 // TX: GPIO14
 // RX: GPIO13
@@ -72,12 +72,14 @@ SDLogger *position_logger;
 // IMUロガー
 SensorLogger sensor_logger;
 
+// 1PPS タイムスタンパ
 volatile uint32_t ppsTimestamp = 0;
 
 void IRAM_ATTR onPPSInterrupt() 
 {
     ppsTimestamp = micros();  // PPS信号受信時のタイムスタンプ（マイクロ秒）
 }
+
 
 /**
  * @brief RTC読み出し
@@ -602,6 +604,7 @@ void loop()
     M5.update();
     i2c_mutex.unlock();
 
+    // PPS信号が来たらLEDを点灯
     if (ppsTimestamp != 0 && ppsTimestamp != prev_pps_timestamp) 
     {
         scrn_main.led_trigger();
@@ -632,9 +635,9 @@ void loop()
         i2c_mutex.lock();
         bmp280_temp->getEvent(&temp_event);
         bmp280_pres->getEvent(&pressure_event);
+        i2c_mutex.unlock();
         sys_status.temp = temp_event.temperature;
         sys_status.pressure = pressure_event.pressure;
-        i2c_mutex.unlock();
         #if GNSS_BYPASS == 0
             Serial.printf("Temp: %.2f C, Pressure: %.2f hPa\r\n", sys_status.temp, sys_status.pressure);
         #endif
@@ -688,4 +691,3 @@ void loop()
 
     delay(10);
 }
-
