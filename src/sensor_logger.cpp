@@ -204,51 +204,63 @@ SensorLogger::SensorLogger()
 {
     sensor_sampler_handle = NULL;
     sensor_logger_handle = NULL;
+    sensor_sampler_terminated = true;
+    sensor_logger_terminated = true;
 }
+
 
 SensorLogger::~SensorLogger()
 {
 }
 
+
 int SensorLogger::start()
 {
-    sensor_sampler_handle = NULL;
-    sensor_logger_handle = NULL;
-    sensor_sampler_terminated = false;
-    sensor_logger_terminated = false;
+    if( imufifo != NULL ) 
+    {
+        // 既に開始されている
+        return -1;
+    }
 
+    sensor_sampler_terminated = true;
+    sensor_logger_terminated = true;
     terminate_sensor_logging = false;
+
     imufifo = new IMUFifo();
     if (imufifo == NULL) 
     {
         ESP_LOGE("SensorLogger", "Failed to create IMUFifo");
-        return -1;
+        goto error_exit;
     }
 
+    sensor_sampler_terminated = false;
+    xTaskCreatePinnedToCore(task_sensor_sampler, "SensorSampler", 2048, NULL, 2, &sensor_sampler_handle, 1);
     if (sensor_sampler_handle == NULL) 
     {
-        xTaskCreatePinnedToCore(task_sensor_sampler, "SensorSampler", 2048, NULL, 2, &sensor_sampler_handle, 1);
-        if (sensor_sampler_handle == NULL) 
-        {
-            ESP_LOGE("SensorLogger", "Failed to create SensorSampler task");
-            sensor_sampler_terminated = true;
-            return -1;
-        }
+        ESP_LOGE("SensorLogger", "Failed to create SensorSampler task");
+        sensor_sampler_terminated = true;
+        goto error_exit;
     }
 
+    sensor_logger_terminated = false;
+    xTaskCreatePinnedToCore(task_sensor_logger, "SensorLogger", 4096, NULL, 0, &sensor_logger_handle, 1);
     if (sensor_logger_handle == NULL) 
     {
-        xTaskCreatePinnedToCore(task_sensor_logger, "SensorLogger", 4096, NULL, 0, &sensor_logger_handle, 1);
-        if (sensor_logger_handle == NULL) 
-        {
-            ESP_LOGE("SensorLogger", "Failed to create SensorLogger task");
-            sensor_logger_terminated = true;
-            terminate_sensor_logging = true;
-            return -1;
-        }
+        ESP_LOGE("SensorLogger", "Failed to create SensorLogger task");
+        sensor_logger_terminated = true;
+        goto error_exit;
     }
 
     return 0;
+
+error_exit:
+    if (imufifo != NULL) 
+    {
+        delete imufifo;
+        imufifo = NULL;
+    }
+    terminate_sensor_logging = true;
+    return -1;
 }
 
 
