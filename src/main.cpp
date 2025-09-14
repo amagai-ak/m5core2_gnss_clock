@@ -20,6 +20,7 @@
 
 // 1にするとGNSSモジュールのシリアル通信をM5StackのSerialに接続する．
 // PCからu-centerでGNSSモジュールにアクセスしたい場合には1にする．
+// 0はデバッグ用で，GNSSモジュールのデータをM5StackのSerialに流さない．
 #define GNSS_BYPASS 1
 
 #include <Arduino.h>
@@ -74,6 +75,8 @@ SensorLogger sensor_logger;
 
 // 1PPS タイムスタンパ
 volatile uint32_t ppsTimestamp = 0;
+static const int IRQ_LATENCY_US = 5; // 割り込み遅延時間（マイクロ秒）
+static const int ADJTIME_LATENCY_US = 10; // adjtimeで補正する時間（マイクロ秒）
 
 void IRAM_ATTR onPPSInterrupt() 
 {
@@ -230,14 +233,18 @@ void rmc_to_systime(nmea_rmc_data_t *rmc)
         epoch += time_zone_offset;
 
         // PPS入力からの経過時間を計算
-        gettimeofday(&tvnow, NULL);
         usec_now = micros();
+        gettimeofday(&tvnow, NULL);
         if (ppsTimestamp != 0) 
         {
             ppsLatency = usec_now - ppsTimestamp;
             if( ppsLatency >= 1000000 ) 
             {
                 ppsLatency = 0;
+            }
+            else
+            {
+                ppsLatency += IRQ_LATENCY_US; // 割り込み遅延時間を補正
             }
         }
         else 
@@ -260,6 +267,9 @@ void rmc_to_systime(nmea_rmc_data_t *rmc)
             tdelta = (tv.tv_sec - tvnow.tv_sec)*1000000 + (tv.tv_usec - tvnow.tv_usec);
         }
 
+        // tdeltaが正のときはシステム時刻が遅れている状態．
+        // Serial.printf("time delta: %d usec, ppsLatency: %u usec\r\n", tdelta, ppsLatency);
+
         // tvnowとtvの差が500ms以上の場合は時刻をジャンプさせる
         if( abs(tdelta) >= 500000 )
         {
@@ -270,7 +280,7 @@ void rmc_to_systime(nmea_rmc_data_t *rmc)
             // 差が小さいときはadjtimeで補正する
             struct timeval tv_adj;
             tv_adj.tv_sec = 0;
-            tv_adj.tv_usec = tdelta;
+            tv_adj.tv_usec = tdelta + ADJTIME_LATENCY_US; // adjtimeの遅延時間を補正
             adjtime(&tv_adj, NULL);
         }
         // 設定値を確認のため表示
