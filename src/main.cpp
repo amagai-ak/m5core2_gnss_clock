@@ -60,10 +60,13 @@ static ScreenManager scrn_manager;
 
 // 気圧センサ
 #define BMP280_SENSOR_ADDR 0x76
-Adafruit_BMP280 bmp280(&Wire);
+// Core2ではWire1を使用．Coreの場合とは違うので注意．
+Adafruit_BMP280 bmp280(&Wire1);
+Adafruit_Sensor *bmp280_temp = bmp280.getTemperatureSensor();
+Adafruit_Sensor *bmp280_pres = bmp280.getPressureSensor();
 
 // SDカードのNMEAロガー
-SDLogger nmea_logger;
+SDLogger *nmea_logger;
 SDLogger *position_logger;
 
 // IMUロガー
@@ -86,7 +89,8 @@ void rtc_read(struct tm *tm)
     m5::rtc_date_t DateStruct2;
     m5::rtc_time_t TimeStruct;
 
-    do{
+    do
+    {
         M5.Rtc.getDate(&DateStruct);
         M5.Rtc.getTime(&TimeStruct);
         M5.Rtc.getDate(&DateStruct2);
@@ -374,7 +378,7 @@ void gnss_poll()
     while( Serial1.available() )
     {
         c = Serial1.read();
-        nmea_logger.write_data((uint8_t *)&c, 1);
+        nmea_logger->write_data((uint8_t *)&c, 1);
         #if GNSS_BYPASS
         Serial.write(c); // GNSS_BYPASSが1の場合は受信したデータをそのままSerialに流す
         #endif
@@ -476,8 +480,8 @@ void gnss_poll()
                     linebuf[linepos++] = c;
                     if( linepos >= 6 + ubx_payload_length + 2 ) 
                     {
-                        // ペイロードとチェックサムを受信し終わった
-                        // ここで本来はUBXメッセージのパースを行うが，今は行わない
+                        // ペイロードとチェックサムを受信し終わった．
+                        // ここで本来はUBXメッセージのパースを行うが，今は何もしない．
                         linestate = 0; // 待機状態へ
                         linepos = 0;
                     }
@@ -509,22 +513,54 @@ void setup()
     M5.begin(cfg);
 
     Serial.begin(115200);
-    Wire.begin(21, 22, 100000);
+
+    M5.Lcd.begin();
+    M5.Lcd.setRotation(1); // 横向き表示
+    M5.Lcd.fillScreen(BLACK);
+    M5.Lcd.setTextColor(WHITE, BLACK);
+    M5.Lcd.setTextSize(2);
+    M5.Lcd.setCursor(0, 0);
+    M5.Lcd.print("M5Stack Core2 GNSS Clock\n");
+//    Wire1.begin(21, 22, 400000);
     setenv("TZ", time_zone, 1);
     tzset();
 
     // RTCを読んでシステム時刻を設定
+    M5.Lcd.print("Setting RTC->SystemTime...\n");
     rtc_to_system_time();
 
-    // センサの初期化
+    // BMP280センサの初期化
     unsigned status = bmp280.begin(BMP280_SENSOR_ADDR);
+    if (!status) 
+    {
+        M5.Lcd.setTextColor(RED, BLACK);
+        M5.Lcd.println("BMP280 not found!\n");
+        while (1) 
+            delay(10);
+    }
 
-	Serial1.begin(38400, SERIAL_8N1, GNSS_RX_PIN, GNSS_TX_PIN); // RX, TX
+    M5.Lcd.print("Initializing BMP280...\n");
+    bmp280.setSampling(Adafruit_BMP280::MODE_NORMAL,
+                  Adafruit_BMP280::SAMPLING_X2,
+                  Adafruit_BMP280::SAMPLING_X16,
+                  Adafruit_BMP280::FILTER_X16,
+                  Adafruit_BMP280::STANDBY_MS_500);
+
+
+    Serial1.begin(38400, SERIAL_8N1, GNSS_RX_PIN, GNSS_TX_PIN); // RX, TX
     sys_status_init(&sys_status);
 
     ppsTimestamp = 0;
     pinMode(GNSS_PPS_PIN, INPUT);
     attachInterrupt(GNSS_PPS_PIN, onPPSInterrupt, RISING);  // PPS信号の立ち上がりで割り込み
+
+    // NMEAロガーの初期化
+    nmea_logger = new SDLogger();
+    nmea_logger->set_prefix("/nmea");
+
+    // 位置ロガーの初期化
+    position_logger = new SDLogger();
+    position_logger->set_prefix("/position");
 
     // LVGLの初期化
     lvgl_setup();
@@ -539,17 +575,20 @@ void setup()
     scrn_manager.add_screen(SCREEN_ID_MAIN, &scrn_main);
     scrn_manager.add_screen(SCREEN_ID_SHUTDOWN, &scrn_shutdown);
 
-    position_logger = new SDLogger();
     if (sd_init() != 0) 
     {
         scrn_main.set_sdcard_status(0); // SDカード利用不可
+        M5.Lcd.setTextColor(YELLOW, BLACK);
+        M5.Lcd.print("SD Card not found\n");
     }
     else 
     {
         scrn_main.set_sdcard_status(1); // SDカード使用可能
-        nmea_logger.set_prefix("/nmea");
-        position_logger->set_prefix("/position");
+        M5.Lcd.setTextColor(GREEN, BLACK);
+        M5.Lcd.print("SD Card found\n");
     }
+
+    delay(1000);
 }
 
 
@@ -581,9 +620,7 @@ void loop()
 
     // LVGLのタスクハンドラを呼び出す.
     // SDカードとLCDがSPIを共有しているので排他制御が必要
-    spi_mutex.lock();
     lv_task_handler();
-    spi_mutex.unlock();
     scrn_manager.loop();
 
     // 毎秒1回の動作
@@ -591,9 +628,12 @@ void loop()
     {
         eachsec = 0;
         // 温度センサデータの更新
+        sensors_event_t temp_event, pressure_event;
         i2c_mutex.lock();
-        sys_status.temp = bmp280.readTemperature();
-        sys_status.pressure = bmp280.readPressure() / 100.0F;
+        bmp280_temp->getEvent(&temp_event);
+        bmp280_pres->getEvent(&pressure_event);
+        sys_status.temp = temp_event.temperature;
+        sys_status.pressure = pressure_event.pressure;
         i2c_mutex.unlock();
         #if GNSS_BYPASS == 0
             Serial.printf("Temp: %.2f C, Pressure: %.2f hPa\r\n", sys_status.temp, sys_status.pressure);
@@ -612,7 +652,7 @@ void loop()
         {
             // Serial.printf("Sync state changed: %d\r\n", sys_status.sync_state);
             prev_sync_state = sys_status.sync_state;
-            nmea_logger.start();
+            nmea_logger->start();
             position_logger->start();
             sensor_logger.start();
             scrn_main.set_sdcard_status(2); // SDカード記録中
@@ -626,7 +666,8 @@ void loop()
     // シャットダウン要求があればシャットダウンする
     if( sys_status.shutdown_request == 1 ) 
     {
-        nmea_logger.stop();
+        nmea_logger->stop();
+        position_logger->stop();
         sensor_logger.stop();
         delay(100);
         M5.Power.powerOff();

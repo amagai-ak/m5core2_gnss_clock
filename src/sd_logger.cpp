@@ -88,6 +88,10 @@ SDLogger::SDLogger()
 
 SDLogger::~SDLogger() 
 {
+    if( sd_status == SD_STATUS_READY ) 
+    {
+        close();
+    }
     delete[] log_buffer;
 }
 

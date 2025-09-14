@@ -3,6 +3,7 @@
 #include <esp_timer.h>
 
 #include "lvgl_setup.h"
+#include "bus_mutex.h"
 
 static lv_display_t *display;
 static lv_indev_t *indev;
@@ -30,7 +31,9 @@ static void my_display_flush(lv_display_t *disp, const lv_area_t *area, uint8_t 
     uint32_t h = (area->y2 - area->y1 + 1);
 
     lv_draw_sw_rgb565_swap(px_map, w*h);
+    spi_mutex.lock();
     M5.Display.pushImageDMA<uint16_t>(area->x1, area->y1, w, h, (uint16_t *)px_map);
+    spi_mutex.unlock();
     lv_disp_flush_ready(disp);
 }
 

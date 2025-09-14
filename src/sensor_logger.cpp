@@ -1,6 +1,6 @@
 /**
  * @file sensor_logger.cpp
- * @author your name (you@domain.com)
+ * @author amagai
  * @brief 
  * @version 0.1
  * @date 2025-09-13
