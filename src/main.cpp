@@ -96,9 +96,11 @@ void rtc_read(struct tm *tm)
 
     do
     {
+        i2c_mutex.lock();
         M5.Rtc.getDate(&DateStruct);
         M5.Rtc.getTime(&TimeStruct);
         M5.Rtc.getDate(&DateStruct2);
+        i2c_mutex.unlock();
     }while( DateStruct.date != DateStruct2.date);
 
     tm->tm_year = DateStruct.year - 1900;
@@ -145,8 +147,10 @@ void rtc_write(struct tm *tm)
     TimeStruct.minutes = tm->tm_min;
     TimeStruct.seconds = tm->tm_sec;
 
+    i2c_mutex.lock();
     M5.Rtc.setDate(&DateStruct);
     M5.Rtc.setTime(&TimeStruct);
+    i2c_mutex.unlock();
 }
 
 
@@ -361,7 +365,6 @@ void gnss_parse_nmea_line(char *line)
         {
             // RMCデータが有効な場合、システム時刻を更新
             rmc_to_systime(&sys_status.rmc_data);
-            rtc_from_system_time();
         }
         else 
         {
@@ -587,6 +590,16 @@ void setup()
     scrn_manager.add_screen(SCREEN_ID_MAIN, &scrn_main);
     scrn_manager.add_screen(SCREEN_ID_SHUTDOWN, &scrn_shutdown);
 
+    // IMUロガーの初期化
+    M5.Lcd.print("Initializing BMI270...\n");
+    if( sensor_logger.init() != 0 ) 
+    {
+        M5.Lcd.setTextColor(RED, BLACK);
+        M5.Lcd.print("BMI270 not found!\n");
+        while(1)
+            delay(10);
+    }
+
     if (sd_init() != 0) 
     {
         scrn_main.set_sdcard_status(0); // SDカード利用不可
@@ -657,6 +670,12 @@ void loop()
         eachsec += 10;
     }
 
+    if( prev_sync_state != sys_status.sync_state && 
+        prev_sync_state == SYNC_STATE_NONE )
+    {
+        rtc_from_system_time();
+    }
+
     // 時計の同期が取れたらロガーを起動
     if( sd_is_fault() == false )
     {
@@ -664,7 +683,6 @@ void loop()
             prev_sync_state == SYNC_STATE_NONE )
         {
             // Serial.printf("Sync state changed: %d\r\n", sys_status.sync_state);
-            prev_sync_state = sys_status.sync_state;
             nmea_logger->start();
             position_logger->start();
             sensor_logger.start();
@@ -699,5 +717,6 @@ void loop()
         scrn_manager.change_screen(SCREEN_ID_SHUTDOWN, SCREEN_ANIM_NONE);
     }
 
+    prev_sync_state = sys_status.sync_state;
     delay(10);
 }

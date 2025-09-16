@@ -10,6 +10,7 @@ typedef struct {
     uint32_t count;      // サンプル番号
     float ax, ay, az;
     float gx, gy, gz;
+    int16_t mx, my, mz;
 } imu_record_t;
 
 class SensorLogger 
@@ -22,6 +23,7 @@ public:
 
     int start();
     int stop();
+    int init();
 };
 
 #endif // SENSOR_LOGGER_H

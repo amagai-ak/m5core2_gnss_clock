@@ -10,6 +10,7 @@
  */
 
 #include "sensor_logger.h"
+#include "M5Module_GNSS.h"
 
 static volatile bool terminate_sensor_logging = false;
 static TaskHandle_t sensor_sampler_handle;
@@ -17,6 +18,9 @@ static TaskHandle_t sensor_logger_handle;
 
 static volatile bool sensor_sampler_terminated = false;
 static volatile bool sensor_logger_terminated = false;
+
+#define BIM270_SENSOR_ADDR 0x68
+BMI270::BMI270 bmi270;
 
 class IMUFifo 
 {
@@ -51,33 +55,38 @@ public:
 
     bool push(const imu_record_t& record) 
     {
+        bool ret = false;
         lock();
         if (count < FIFO_SIZE) 
         {
             buffer[head] = record;
             head = (head + 1) % FIFO_SIZE;
             count++;
-            unlock();
-            return true;
+            ret = true;
         }
-        overflow++;
+        else
+        {
+            // FIFOがいっぱいでデータを追加できない
+            overflow++;
+            ret = false;
+        }
         unlock();
-        return false;
+        return ret;
     }
 
     bool pop(imu_record_t& record) 
     {
+        bool ret = false;
         lock();
         if (count > 0) 
         {
             record = buffer[tail];
             tail = (tail + 1) % FIFO_SIZE;
             count--;
-            unlock();
-            return true;
+            ret = true;
         }
         unlock();
-        return false;
+        return ret;
     }
 
     int size() const 
@@ -111,10 +120,15 @@ static void task_sensor_sampler(void *param)
     struct timeval tv;
     imu_record_t record;
     uint32_t samplecount = 0;
-
+    float x, y, z;
+    float gx, gy, gz;
+    int16_t mx, my, mz;
 
     xLastWakeTime = xTaskGetTickCount();
 
+    x = y = z = 0.0f;
+    gx = gy = gz = 0.0f;
+    mx = my = mz = 0;
     while (terminate_sensor_logging == false) 
     {
         // 時刻の取得
@@ -122,10 +136,29 @@ static void task_sensor_sampler(void *param)
 
         // センサデータの更新
         i2c_mutex.lock();
-        M5.Imu.getAccelData(&record.ax, &record.ay, &record.az);
-        M5.Imu.getGyroData(&record.gx, &record.gy, &record.gz);
+        if (bmi270.accelerationAvailable()) 
+        {
+            bmi270.readAcceleration(x, y, z);
+        }
+        if (bmi270.gyroscopeAvailable()) 
+        {
+            bmi270.readGyroscope(gx, gy, gz);
+        }
+        if (bmi270.magneticFieldAvailable()) 
+        {
+            bmi270.readMagneticField(mx, my, mz);
+        }
         i2c_mutex.unlock();
 
+        record.ax = x;
+        record.ay = y;
+        record.az = z;
+        record.gx = gx;
+        record.gy = gy;
+        record.gz = gz;
+        record.mx = mx;
+        record.my = my;
+        record.mz = mz;
         record.timestamp = tv;
         record.count = samplecount++;
         if (!imufifo->push(record)) 
@@ -171,11 +204,13 @@ static void task_sensor_logger(void *param)
         if (imufifo->pop(record)) 
         {
             // ログ行の生成
-            len = snprintf(logline, sizeof(logline), "%ld.%06ld,%u,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",
+            len = snprintf(logline, sizeof(logline), 
+                            "%ld.%06ld,%u,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%d,%d,%d\n",
                            record.timestamp.tv_sec, record.timestamp.tv_usec,
                            record.count,
                            record.ax, record.ay, record.az,
-                           record.gx, record.gy, record.gz);
+                           record.gx, record.gy, record.gz,
+                           record.mx, record.my, record.mz);
             if (len > 0 && len < sizeof(logline)) 
             {
                 if (imu_logger->write_data((const uint8_t *)logline, len) != 0) 
@@ -234,7 +269,7 @@ int SensorLogger::start()
     }
 
     sensor_sampler_terminated = false;
-    xTaskCreatePinnedToCore(task_sensor_sampler, "SensorSampler", 2048, NULL, 2, &sensor_sampler_handle, 1);
+    xTaskCreatePinnedToCore(task_sensor_sampler, "SensorSampler", 2048, NULL, 1, &sensor_sampler_handle, 0);
     if (sensor_sampler_handle == NULL) 
     {
         ESP_LOGE("SensorLogger", "Failed to create SensorSampler task");
@@ -281,4 +316,22 @@ int SensorLogger::stop()
         imufifo = NULL;
     }
     return 0;
+}
+
+
+int SensorLogger::init()
+{
+    int rtn;
+
+    // IMUの初期化
+    if( bmi270.init(I2C_NUM_1, BIM270_SENSOR_ADDR) == false ) 
+    {
+        rtn = -1;
+    }
+    else 
+    {
+        rtn = 0;
+    }
+
+    return rtn;
 }
