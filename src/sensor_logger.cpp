@@ -269,7 +269,7 @@ int SensorLogger::start()
     }
 
     sensor_sampler_terminated = false;
-    xTaskCreatePinnedToCore(task_sensor_sampler, "SensorSampler", 2048, NULL, 1, &sensor_sampler_handle, 0);
+    xTaskCreatePinnedToCore(task_sensor_sampler, "SensorSampler", 2048, NULL, 0, &sensor_sampler_handle, 0);
     if (sensor_sampler_handle == NULL) 
     {
         ESP_LOGE("SensorLogger", "Failed to create SensorSampler task");

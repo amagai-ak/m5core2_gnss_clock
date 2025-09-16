@@ -527,6 +527,7 @@ void setup()
     auto cfg = M5.config();
     M5.begin(cfg);
 
+    Serial.setRxBufferSize(1024);
     Serial.begin(115200);
 
     M5.Lcd.begin();
@@ -536,7 +537,6 @@ void setup()
     M5.Lcd.setTextSize(2);
     M5.Lcd.setCursor(0, 0);
     M5.Lcd.print("M5Stack Core2 GNSS Clock\n");
-//    Wire1.begin(21, 22, 400000);
     setenv("TZ", time_zone, 1);
     tzset();
 
@@ -562,6 +562,7 @@ void setup()
                   Adafruit_BMP280::STANDBY_MS_500);
 
 
+    Serial1.setRxBufferSize(1024);
     Serial1.begin(38400, SERIAL_8N1, GNSS_RX_PIN, GNSS_TX_PIN); // RX, TX
     sys_status_init(&sys_status);
 
