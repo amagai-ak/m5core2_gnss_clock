@@ -101,6 +101,7 @@ class ScreenMain : public ScreenBase
 protected:
     lv_obj_t *label_clock;
     lv_obj_t *label_date;
+    lv_obj_t *label_battery;
     lv_obj_t *led;
     int led_duration;
     unsigned int last_update;
@@ -113,6 +114,7 @@ protected:
     int sync_state; // 0: 未同期, 1: 同期中, 2: 同期完了
     int sync_state_prev;
     int sdcard_state; // 0: 利用不可, 1: 使用可能, 2: 使用中
+    int battery_level; // バッテリー残量 (0-100%)
 
 public:
     void setup();
@@ -127,6 +129,7 @@ public:
     void update_satellite_all();
     void set_sync_state(int state); // 0: 未同期, 1: 同期中, 2: 同期完了
     void set_sdcard_status(int status);
+    void set_battery_level(int level);
 };
 
 #endif // SCRN_MAIN_H

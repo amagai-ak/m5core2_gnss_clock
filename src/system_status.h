@@ -20,6 +20,7 @@ typedef struct {
 
     int sync_state; // 0: not synchronized, 1: synchronized
     int shutdown_request; // 1: shutdown requested, 0: running
+    int battery_level; // Battery level (0-100%)
 } system_status_t;
 
 extern system_status_t sys_status;

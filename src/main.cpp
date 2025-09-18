@@ -622,8 +622,9 @@ void loop()
 {
     static uint32_t prev_pps_timestamp = 0;
     static int prev_sync_state = SYNC_STATE_NONE;
-    static int eachsec = 0;
-    
+    static uint32_t prev_sec = 0;
+    uint32_t sec;
+
     i2c_mutex.lock();
     M5.update();
     i2c_mutex.unlock();
@@ -651,24 +652,22 @@ void loop()
     scrn_manager.loop();
 
     // 毎秒1回の動作
-    if( eachsec > 1000 ) 
+    sec = millis() / 1000;
+    if( sec != prev_sec ) 
     {
-        eachsec = 0;
+        prev_sec = sec;
         // 温度センサデータの更新
         sensors_event_t temp_event, pressure_event;
         i2c_mutex.lock();
         bmp280_temp->getEvent(&temp_event);
         bmp280_pres->getEvent(&pressure_event);
+        sys_status.battery_level = M5.Power.getBatteryLevel();
         i2c_mutex.unlock();
         sys_status.temp = temp_event.temperature;
         sys_status.pressure = pressure_event.pressure;
         #if GNSS_BYPASS == 0
-            Serial.printf("Temp: %.2f C, Pressure: %.2f hPa\r\n", sys_status.temp, sys_status.pressure);
+            Serial.printf("Batt: %d%%, Temp: %.2f C, Pressure: %.2f hPa\r\n", sys_status.battery_level, sys_status.temp, sys_status.pressure);
         #endif
-    }
-    else 
-    {
-        eachsec += 10;
     }
 
     if( prev_sync_state != sys_status.sync_state && 

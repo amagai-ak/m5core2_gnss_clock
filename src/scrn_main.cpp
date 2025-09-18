@@ -267,6 +267,14 @@ void ScreenMain::setup()
     lv_obj_set_style_text_color(label_date, lv_color_make(182, 182, 182), 0);
     lv_obj_set_style_text_align(label_date, LV_TEXT_ALIGN_CENTER, 0);
 
+    // バッテリー残量を表示するラベルを作成．日付の右側に出す．
+    label_battery = lv_label_create(lv_screen);
+    lv_label_set_text(label_battery, LV_SYMBOL_BATTERY_FULL);
+    lv_obj_align(label_battery, LV_ALIGN_TOP_LEFT, 170, 0);
+    lv_obj_set_style_text_font(label_battery, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_color(label_battery, lv_color_make(182, 182, 182), 0);
+    lv_obj_set_style_text_align(label_battery, LV_TEXT_ALIGN_CENTER, 0);
+
     // LED
     led = lv_led_create(lv_screen);
     lv_obj_set_size(led, 24, 24);
@@ -435,6 +443,9 @@ void ScreenMain::loop()
         boxl_temp.set_text2(buf);
         snprintf(buf, sizeof(buf), "%.1f", sys_status.pressure);
         boxl_pres.set_text2(buf);
+
+        // バッテリー残量
+        set_battery_level(sys_status.battery_level);
     }
 
     // LEDの更新
@@ -523,5 +534,45 @@ void ScreenMain::set_sync_state(int state)
                 break;
         }
         sync_state_prev = sync_state;
+    }
+}
+
+
+void ScreenMain::set_battery_level(int level)
+{
+    if( level < 0 ) 
+        level = 0;
+    if( level > 100 ) 
+        level = 100;
+    if( battery_level != level )
+    {
+        battery_level = level;
+        if( battery_level > 80 )
+        {
+            lv_obj_set_style_text_color(label_battery, lv_color_make(182, 182, 182), 0);
+            lv_label_set_text(label_battery, LV_SYMBOL_BATTERY_FULL);
+        }
+        else if( battery_level > 60 )
+        {
+            lv_obj_set_style_text_color(label_battery, lv_color_make(182, 182, 182), 0);
+            lv_label_set_text(label_battery, LV_SYMBOL_BATTERY_3);
+        }
+        else if( battery_level > 40 )
+        {
+            lv_obj_set_style_text_color(label_battery, lv_color_make(182, 182, 182), 0);
+            lv_label_set_text(label_battery, LV_SYMBOL_BATTERY_2);
+        }
+        else if( battery_level > 20 )
+        {
+            // 20%以下ならオレンジ色で表示
+            lv_obj_set_style_text_color(label_battery, lv_color_make(255, 165, 0), 0);
+            lv_label_set_text(label_battery, LV_SYMBOL_BATTERY_1);
+        }
+        else
+        {
+            // 20%以下なら赤く表示
+            lv_obj_set_style_text_color(label_battery, lv_color_make(255, 0, 0), 0);
+            lv_label_set_text(label_battery, LV_SYMBOL_BATTERY_EMPTY);
+        }
     }
 }
