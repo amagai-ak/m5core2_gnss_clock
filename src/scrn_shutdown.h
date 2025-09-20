@@ -16,6 +16,7 @@ public:
     void loop();
     static void callback(lv_event_t *e);
     void on_button(lv_obj_t *btn);
+    void on_button_long_press(lv_obj_t *btn);
     void on_swipe(lv_dir_t dir);
     void set_shutdown_request_ptr(int *ptr) { shutdown_request = ptr; }
 };
