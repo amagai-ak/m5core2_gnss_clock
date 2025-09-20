@@ -35,6 +35,7 @@
 
 #include "scrn_main.h"
 #include "scrn_shutdown.h"
+#include "scrn_terminal.h"
 #include "screen_id.h"
 
 #include "nmea_parser.h"
@@ -55,6 +56,7 @@ system_status_t sys_status;
 // 各スクリーンのインスタンスを生成
 static ScreenMain scrn_main;
 static ScreenShutdown scrn_shutdown;
+static ScreenTerminal scrn_terminal;
 
 // スクリーンマネージャのインスタンスを生成
 static ScreenManager scrn_manager;
@@ -593,11 +595,13 @@ void setup()
     scrn_main.setup();
     scrn_shutdown.setup();
     scrn_shutdown.set_shutdown_request_ptr(&sys_status.shutdown_request);
+    scrn_terminal.setup();
 
     // スクリーンマネージャにスクリーンを追加
     // 最初に追加したスクリーンが最初に表示されるスクリーンになる
     scrn_manager.add_screen(SCREEN_ID_MAIN, &scrn_main);
     scrn_manager.add_screen(SCREEN_ID_SHUTDOWN, &scrn_shutdown);
+    scrn_manager.add_screen(SCREEN_ID_TERMINAL, &scrn_terminal);
 
     // IMUロガーの初期化
     M5.Lcd.print("Initializing BMI270...\n");
@@ -614,12 +618,14 @@ void setup()
         scrn_main.set_sdcard_status(0); // SDカード利用不可
         M5.Lcd.setTextColor(YELLOW, BLACK);
         M5.Lcd.print("SD Card not found\n");
+        scrn_terminal.print("SD Card not found\n");
     }
     else 
     {
         scrn_main.set_sdcard_status(1); // SDカード使用可能
         M5.Lcd.setTextColor(GREEN, BLACK);
         M5.Lcd.print("SD Card found\n");
+        scrn_terminal.print("SD Card found\n");
     }
 
     delay(1000);
@@ -720,7 +726,7 @@ void loop()
     if (M5.BtnB.wasPressed()) {
         scrn_manager.change_screen(SCREEN_ID_MAIN, SCREEN_ANIM_NONE);
     } else if (M5.BtnA.wasPressed()) {
-        scrn_manager.change_screen(SCREEN_ID_SHUTDOWN, SCREEN_ANIM_NONE);
+        scrn_manager.change_screen(SCREEN_ID_TERMINAL, SCREEN_ANIM_NONE);
     } else if (M5.BtnC.wasPressed()) {
         scrn_manager.change_screen(SCREEN_ID_SHUTDOWN, SCREEN_ANIM_NONE);
     }
