@@ -304,22 +304,30 @@ void rmc_to_systime(nmea_rmc_data_t *rmc)
 
 
 /**
- * @brief GGAデータから位置情報をSDカードに記録する
+ * @brief RMC, GGAデータから位置情報をSDカードに記録する
  * 
+ * @param rmc_data RMCデータ
+ * @param gga_data GGAデータ
+ * 
+ *  
+ * GGAデータには日付が含まれないため，RMCデータも必要.
+ * GNSSレシーバからは，RMC,GGAの順でデータが送られてくることを前提としている.
  */
-void log_position_data(nmea_gga_data_t *gga_data)
+void log_position_data(nmea_rmc_data_t *rmc_data, nmea_gga_data_t *gga_data)
 {
     if( position_logger->get_status() == SD_STATUS_READY )
     {
         char log_line[128];
         int n;
         n = snprintf(log_line, sizeof(log_line), 
-        "%02d:%02d:%02d.%03d,%.7f,%.7f,%.2f,%d,%d,%.2f\n",
+        "%04d-%02d-%02dT%02d:%02d:%02d.%03dZ,%.7f,%.7f,%.2f,%d,%d,%.2f\n",
+        rmc_data->date_year, rmc_data->date_month, rmc_data->date_day,
         gga_data->time_hour, gga_data->time_minute, gga_data->time_second, gga_data->time_millisecond,
         gga_data->latitude, gga_data->longitude, gga_data->altitude,
         gga_data->fix_type, gga_data->num_sats, gga_data->hdop);
 
         position_logger->write_data((uint8_t *)log_line, n);
+//        Serial.printf("Position: %s\r\n", log_line);
     }
 }
 
@@ -348,7 +356,7 @@ void gnss_parse_nmea_line(char *line)
             sys_status.gga_data = new_gga; // 新しいGGAデータを更新
             sys_status.gps_status = new_gga.fix_type; // GPSの状態を更新
             sys_status.gps_satellites = new_gga.num_sats; // 使用衛星数を更新
-            log_position_data(&new_gga); // 位置情報をSDカードに記録
+            log_position_data(&sys_status.rmc_data, &new_gga); // 位置情報をSDカードに記録
         }
     }
     else if( line[1] == 'G' && line[3] == 'G' && line[4] == 'S' && line[5] == 'V' )
@@ -647,7 +655,6 @@ void loop()
     #endif
 
     // LVGLのタスクハンドラを呼び出す.
-    // SDカードとLCDがSPIを共有しているので排他制御が必要
     lv_task_handler();
     scrn_manager.loop();
 
@@ -670,13 +677,14 @@ void loop()
         #endif
     }
 
+    // 時計の同期が取れた直後にRTCを更新
     if( prev_sync_state != sys_status.sync_state && 
         prev_sync_state == SYNC_STATE_NONE )
     {
         rtc_from_system_time();
     }
 
-    // 時計の同期が取れたらロガーを起動
+    // SDカードが挿入されており，かつ，時計の同期が取れたらロガーを起動
     if( sd_is_fault() == false )
     {
         if( prev_sync_state != sys_status.sync_state && 

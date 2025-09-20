@@ -31,11 +31,13 @@ static void my_display_flush(lv_display_t *disp, const lv_area_t *area, uint8_t 
     uint32_t h = (area->y2 - area->y1 + 1);
 
     lv_draw_sw_rgb565_swap(px_map, w*h);
+    // SDカードとLCDがSPIを共有しているので排他制御が必要
     spi_mutex.lock();
     M5.Display.pushImageDMA<uint16_t>(area->x1, area->y1, w, h, (uint16_t *)px_map);
     spi_mutex.unlock();
     lv_disp_flush_ready(disp);
 }
+
 
 static void my_touchpad_read(lv_indev_t * drv, lv_indev_data_t * data) 
 {
