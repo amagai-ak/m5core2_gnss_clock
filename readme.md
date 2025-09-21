@@ -85,7 +85,9 @@ u-centerの通信レートを115200bpsに設定し，ポートをM5Stackが接�
 ただし，シリアルポートの通信レートに注意．PC-M5Stack間は115200bps, M5Stack-NEO 間は38400bpsに固定されているので，
 u-centerで通信レートを変更すると通信できなくなる．
 
-## 使用しているフォント
+## 使用しているカスタムフォント
 
 https://fonts.google.com/specimen/Open+Sans
+
+https://hicchicc.github.io/00ff/
 
