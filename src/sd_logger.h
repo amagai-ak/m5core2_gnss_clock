@@ -40,5 +40,6 @@ public:
 
 extern int sd_init();
 extern bool sd_is_fault();
+extern int sd_get_free_mb();
 
 #endif // SD_LOGGER_H

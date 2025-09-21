@@ -71,6 +71,22 @@ bool sd_is_fault()
 }
 
 
+/**
+ * @brief SDカードの空き容量をMB単位で取得する
+ * 
+ * @return int 空き容量(MB)，SDカードが初期化されていないか障害が発生している場合は-1
+ */
+int sd_get_free_mb()
+{
+    if( !sd_initialized || sd_fault ) 
+    {
+        return -1;
+    }
+    uint64_t free_bytes = SD.totalBytes() - SD.usedBytes();
+    return free_bytes / (1024 * 1024);
+}
+
+
 SDLogger::SDLogger()
 {
     log_buffer = new uint8_t[buffer_size];

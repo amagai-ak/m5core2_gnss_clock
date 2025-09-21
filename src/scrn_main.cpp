@@ -473,8 +473,8 @@ void ScreenMain::on_swipe(lv_dir_t dir)
     }
     else if (dir == LV_DIR_RIGHT)
     {
-        // 右スワイプでシャットダウン画面へ
-        change_screen(SCREEN_ID_SHUTDOWN, SCREEN_ANIM_RIGHT);
+        // 右スワイプでターミナル画面へ
+        change_screen(SCREEN_ID_TERMINAL, SCREEN_ANIM_RIGHT);
     }
 }
 

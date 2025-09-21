@@ -87,6 +87,36 @@ void IRAM_ATTR onPPSInterrupt()
 
 
 /**
+ * @brief ターミナルにログメッセージを出力する
+ * 
+ * @param msg 出力するメッセージ
+ * @param timestamp タイムスタンプを付けるならtrue
+ */
+void term_log(const char* msg, bool timestamp = true)
+{
+    char buf[256];
+    struct timeval tv;
+    struct tm tm;
+
+    if( !timestamp ) 
+    {
+        scrn_terminal.print(msg);
+        scrn_terminal.print("\n");
+    }
+    else 
+    {
+        gettimeofday(&tv, NULL);
+        localtime_r(&tv.tv_sec, &tm);
+        snprintf(buf, sizeof(buf), "%04d/%02d/%02d %02d:%02d:%02d.%03ld\n%s\n",
+                tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+                tm.tm_hour, tm.tm_min, tm.tm_sec,
+                tv.tv_usec / 1000, msg);
+        scrn_terminal.print(buf);
+    }
+}
+
+
+/**
  * @brief RTC読み出し
  * @param tm 時刻情報格納先
  */
@@ -275,6 +305,7 @@ void rmc_to_systime(nmea_rmc_data_t *rmc)
 
         // tdeltaが正のときはシステム時刻が遅れている状態．
         // Serial.printf("time delta: %d usec, ppsLatency: %u usec\r\n", tdelta, ppsLatency);
+//        scrn_terminal.printf("time delta: %d usec, ppsLatency: %u usec\n", tdelta, ppsLatency);
 
         // tvnowとtvの差が500ms以上の場合は時刻をジャンプさせる
         if( abs(tdelta) >= 500000 )
@@ -626,8 +657,13 @@ void setup()
         M5.Lcd.setTextColor(GREEN, BLACK);
         M5.Lcd.print("SD Card found\n");
         scrn_terminal.print("SD Card found\n");
+        int free_mb = sd_get_free_mb();
+        scrn_terminal.printf("SD Card free space: %d MB\n", free_mb);
     }
 
+    #if GNSS_BYPASS
+        term_log("GNSS Bypass mode", false);
+    #endif
     delay(1000);
 }
 
@@ -688,6 +724,7 @@ void loop()
         prev_sync_state == SYNC_STATE_NONE )
     {
         rtc_from_system_time();
+        term_log("RTC updated from System Time");
     }
 
     // SDカードが挿入されており，かつ，時計の同期が取れたらロガーを起動
