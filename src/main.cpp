@@ -94,24 +94,21 @@ void IRAM_ATTR onPPSInterrupt()
  */
 void term_log(const char* msg, bool timestamp = true)
 {
-    char buf[256];
     struct timeval tv;
     struct tm tm;
 
     if( !timestamp ) 
     {
-        scrn_terminal.print(msg);
-        scrn_terminal.print("\n");
+        scrn_terminal.println(msg);
     }
     else 
     {
         gettimeofday(&tv, NULL);
         localtime_r(&tv.tv_sec, &tm);
-        snprintf(buf, sizeof(buf), "%04d/%02d/%02d %02d:%02d:%02d.%03ld\n%s\n",
+        scrn_terminal.printf("%04d/%02d/%02d %02d:%02d:%02d.%03ld\n%s\n",
                 tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
                 tm.tm_hour, tm.tm_min, tm.tm_sec,
                 tv.tv_usec / 1000, msg);
-        scrn_terminal.print(buf);
     }
 }
 
@@ -668,12 +665,48 @@ void setup()
 }
 
 
+void every_1s_task()
+{
+    // 1秒毎に実行するタスク
+
+    // 温度センサデータの更新
+    sensors_event_t temp_event, pressure_event;
+    i2c_mutex.lock();
+    bmp280_temp->getEvent(&temp_event);
+    bmp280_pres->getEvent(&pressure_event);
+    sys_status.battery_level = M5.Power.getBatteryLevel();
+    i2c_mutex.unlock();
+    sys_status.temp = temp_event.temperature;
+    sys_status.pressure = pressure_event.pressure;
+    #if GNSS_BYPASS == 0
+        Serial.printf("Batt: %d%%, Temp: %.2f C, Pressure: %.2f hPa\r\n", sys_status.battery_level, sys_status.temp, sys_status.pressure);
+    #endif
+}
+
+void every_1m_task()
+{
+    // 1分毎に実行するタスク
+}
+
+void every_1h_task()
+{
+    // 1時間毎に実行するタスク
+    // RTCを更新
+    if( sys_status.sync_state != SYNC_STATE_NONE )
+    {
+        rtc_from_system_time();
+        term_log("RTC updated");
+    }
+}
+
+
 void loop() 
 {
     static uint32_t prev_pps_timestamp = 0;
     static int prev_sync_state = SYNC_STATE_NONE;
     static uint32_t prev_sec = 0;
     uint32_t sec;
+    static uint32_t sec_count = 0;
 
     i2c_mutex.lock();
     M5.update();
@@ -704,19 +737,17 @@ void loop()
     sec = millis() / 1000;
     if( sec != prev_sec ) 
     {
+        every_1s_task();
+        sec_count++;
+        if( sec_count % 60 == 0 )
+        {
+            every_1m_task();
+        }
+        if( sec_count % 3600 == 0 )
+        {
+            every_1h_task();
+        }
         prev_sec = sec;
-        // 温度センサデータの更新
-        sensors_event_t temp_event, pressure_event;
-        i2c_mutex.lock();
-        bmp280_temp->getEvent(&temp_event);
-        bmp280_pres->getEvent(&pressure_event);
-        sys_status.battery_level = M5.Power.getBatteryLevel();
-        i2c_mutex.unlock();
-        sys_status.temp = temp_event.temperature;
-        sys_status.pressure = pressure_event.pressure;
-        #if GNSS_BYPASS == 0
-            Serial.printf("Batt: %d%%, Temp: %.2f C, Pressure: %.2f hPa\r\n", sys_status.battery_level, sys_status.temp, sys_status.pressure);
-        #endif
     }
 
     // 時計の同期が取れた直後にRTCを更新
@@ -724,7 +755,7 @@ void loop()
         prev_sync_state == SYNC_STATE_NONE )
     {
         rtc_from_system_time();
-        term_log("RTC updated from System Time");
+        term_log("RTC updated");
     }
 
     // SDカードが挿入されており，かつ，時計の同期が取れたらロガーを起動
