@@ -16,7 +16,7 @@ constexpr int32_t VER_RES=240;
 constexpr int32_t BYTES_PER_PIXEL = (LV_COLOR_FORMAT_GET_SIZE(LV_COLOR_FORMAT_RGB565));
 
 // 描画バッファの分割数．大きいほど省メモリになるが，描画が遅くなる．
-constexpr int32_t DISPBUF_DIVIDE = 10;
+constexpr int32_t DISPBUF_DIVIDE = 4;
 
 
 static uint32_t my_tick_function() 

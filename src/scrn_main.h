@@ -81,7 +81,6 @@ protected:
     int sat_positions[MAX_SATELLITES][4]; // 衛星の位置 (PRN, x, y, SNR) 座標
     static const int img_h = 100;
     static const int img_w = 100;
-    lv_color_t draw_buf[img_w * img_h]; // 描画用バッファ
     lv_obj_t *canvas;
     int r_0, r_45;
     uint8_t *cbuf;
