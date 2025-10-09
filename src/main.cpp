@@ -799,6 +799,12 @@ void loop()
         scrn_manager.change_screen(SCREEN_ID_SHUTDOWN, SCREEN_ANIM_NONE);
     }
 
+    // 電源ボタンが押されたらシャットダウン画面へ
+    if( M5.BtnPWR.wasClicked() ) 
+    {
+        scrn_manager.change_screen(SCREEN_ID_SHUTDOWN, SCREEN_ANIM_NONE);
+    }
+
     prev_sync_state = sys_status.sync_state;
     delay(10);
 }
