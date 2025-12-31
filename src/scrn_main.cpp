@@ -51,10 +51,15 @@ void BoxLabel::init(lv_obj_t *parent, int x, int y, int w, int h, const char *te
     lv_obj_clear_flag(label2, LV_OBJ_FLAG_SCROLLABLE);
 }
 
+
+/**
+ * @brief 衛星配置のキャンバスを描画
+ * 
+ */
 void SatelliteDisplay::paint_canvas()
 {
     lv_canvas_init_layer(canvas, &layer);
-    lv_canvas_fill_bg(canvas, lv_color_make(0x00, 0x00, 0x40), LV_OPA_COVER); // キャンバスの背景を黒に設定
+    lv_canvas_fill_bg(canvas, lv_color_make(0x00, 0x00, 0x40), LV_OPA_COVER); // キャンバスの背景を暗い青に設定
 
     lv_draw_arc_dsc_t arc_dsc;
     lv_draw_arc_dsc_init(&arc_dsc);
@@ -130,6 +135,7 @@ void SatelliteDisplay::init(lv_obj_t *parent, int x, int y)
     paint_canvas(); // キャンバスの初期描画
 }
 
+
 SatelliteDisplay::SatelliteDisplay()
 {
     int i;
@@ -159,6 +165,16 @@ SatelliteDisplay::~SatelliteDisplay()
     }
 }
 
+
+/**
+ * @brief 衛星の位置を設定
+ * 
+ * @param prn PRN番号
+ * @param elv 仰角
+ * @param azm 方位角
+ * @param snr SNR
+ * @return int 成功したら0，失敗したら-1
+ */
 int SatelliteDisplay::set_sat_pos(int prn, int elv, int azm, int snr)
 {
     int i;
@@ -204,6 +220,13 @@ int SatelliteDisplay::set_sat_pos(int prn, int elv, int azm, int snr)
     return -1; // エラー
 }
 
+
+/**
+ * @brief 衛星の削除
+ * 
+ * @param prn 削除対象のPRN番号
+ * @return int 成功したら0，失敗したら-1
+ */
 int SatelliteDisplay::remove_sat(int prn)
 {
     int i;
@@ -240,6 +263,10 @@ void ScreenMain::callback(lv_event_t *e)
 }
 
 
+/**
+ * @brief Initialize the main screen
+ * 
+ */
 void ScreenMain::setup()
 {
     int lbl_h, lbl_y;
@@ -338,6 +365,11 @@ void ScreenMain::setup()
 }
 
 
+/**
+ * @brief SDカードの状態を設定
+ * 
+ * @param status SDカードの状態 (0: 不可, 1: 可, 2: 記録中)
+ */
 void ScreenMain::set_sdcard_status(int status)
 {
     if( sdcard_state != status )
@@ -513,6 +545,14 @@ void ScreenMain::update_satellite_all()
     update_satellite(&sys_status.gsv_data.qzss);
 }
 
+
+/**
+ * @brief 同期状態の設定
+ * 
+ * @param state 同期状態 (0: 不同期, 1: 同期中, 2: 同期完了)
+ * 
+ * 同期状態に応じて時計の色を変える
+ */
 void ScreenMain::set_sync_state(int state)
 {
     sync_state = state;
@@ -538,6 +578,11 @@ void ScreenMain::set_sync_state(int state)
 }
 
 
+/**
+ * @brief バッテリー残量インジケータの更新
+ * 
+ * @param level Battery level (0-100)
+ */
 void ScreenMain::set_battery_level(int level)
 {
     if( level < 0 ) 
