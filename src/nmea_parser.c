@@ -649,7 +649,7 @@ int nmea_parse_rmc(const char *nmea_sentence, nmea_rmc_data_t *rmc_data)
         case 'F': // Float RTK
             rmc_data->fix_type = NMEA_FIX_TYPE_RTK_FLOAT;
             break;
-        case 'G': // Fixed RTK
+        case 'R': // Fixed RTK
             rmc_data->fix_type = NMEA_FIX_TYPE_RTK_FIXED;
             break;
         case 'P': // PPP
